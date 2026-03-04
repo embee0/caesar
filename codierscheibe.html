@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Caesar Codierscheibe</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;0,700;1,400&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    display: flex; flex-direction: column;
+    background: linear-gradient(135deg, #2c1810 0%, #1a0f08 50%, #2c1810 100%);
+    font-family: 'EB Garamond', Georgia, serif; color: #f5e6c8;
+  }
+
+  /* ===== HEADER ===== */
+  .header { display: flex; align-items: baseline; justify-content: center; gap: 16px; padding: 8px 0 4px; flex-shrink: 0; }
+  .header h1 { font-size: 1.7rem; font-weight: 600; letter-spacing: 6px; color: #d4b070; text-shadow: 0 2px 4px rgba(0,0,0,0.5); text-transform: uppercase; }
+  .header .subtitle { font-size: 0.85rem; color: #a08050; letter-spacing: 4px; font-style: italic; }
+
+  /* ===== LAYOUT ===== */
+  .app-container { display: flex; flex: 1; min-height: 0; gap: 16px; padding: 0 20px 10px; }
+
+  /* Left column: wheel + settings below */
+  .left-column { display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; width: min(72vh, 600px); }
+  .wheel-container { width: 100%; aspect-ratio: 1/1; cursor: grab; user-select: none; -webkit-user-select: none; flex-shrink: 0; }
+  .wheel-container:active { cursor: grabbing; }
+  .wheel-container svg { width: 100%; height: 100%; }
+
+  /* Right column: cipher panel */
+  .right-column { flex: 1; min-width: 300px; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+
+  /* ===== PANELS ===== */
+  .panel { background: linear-gradient(145deg, rgba(90,56,16,0.4), rgba(40,25,8,0.6)); border: 1px solid rgba(160,112,48,0.35); border-radius: 10px; padding: 12px 16px; backdrop-filter: blur(8px); }
+  .panel-title { font-size: 0.85rem; letter-spacing: 3px; color: #d4b070; margin-bottom: 8px; text-transform: uppercase; border-bottom: 1px solid rgba(160,112,48,0.3); padding-bottom: 5px; }
+
+  /* ===== SHIFT PANEL ===== */
+  .shift-row { display: flex; align-items: center; gap: 14px; }
+  .shift-display { font-size: 2.2rem; font-weight: 700; color: #e0c060; min-width: 50px; text-align: center; text-shadow: 0 2px 6px rgba(0,0,0,0.5); line-height: 1; }
+  .shift-display .roman { font-size: 0.8rem; color: #a08050; display: block; margin-top: 2px; }
+  .slider-wrap { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+  .slider-labels { display: flex; justify-content: space-between; font-size: 0.65rem; color: #8a6830; }
+
+  /* Emoji toggle */
+  .emoji-toggle { display: flex; align-items: center; gap: 8px; margin: 6px 0 4px; cursor: pointer; user-select: none; }
+  .emoji-toggle input[type="checkbox"] {
+    appearance: none; -webkit-appearance: none; width: 18px; height: 18px;
+    border: 1.5px solid rgba(160,112,48,0.5); border-radius: 4px; background: rgba(20,12,5,0.6);
+    cursor: pointer; position: relative; flex-shrink: 0;
+  }
+  .emoji-toggle input[type="checkbox"]:checked { background: linear-gradient(145deg, #8b5e1a, #6b4310); border-color: #c9a84c; }
+  .emoji-toggle input[type="checkbox"]:checked::after { content: '✓'; position: absolute; top: -1px; left: 3px; font-size: 13px; color: #f5e6c8; }
+  .emoji-toggle-label { font-size: 0.85rem; color: #c9a84c; letter-spacing: 1px; }
+  .emoji-hint { font-size: 0.75rem; color: #8a6830; }
+
+  /* Mapping preview */
+  .mapping-preview { display: flex; flex-wrap: wrap; gap: 1px 2px; justify-content: center; margin-top: 4px; }
+  .mapping-pair { display: flex; flex-direction: column; align-items: center; width: 26px; font-size: 0.68rem; line-height: 1.15; }
+  .mapping-pair .plain { color: #e0c060; font-weight: 700; }
+  .mapping-pair .arrow { color: #6a5030; font-size: 0.45rem; }
+  .mapping-pair .cipher { color: #a08050; }
+  .mapping-preview.emoji-active .mapping-pair { width: 30px; }
+  .mapping-preview.emoji-active .cipher { font-size: 0.8rem; }
+
+  /* ===== TEMPO (compact) ===== */
+  .tempo-panel { display: flex; align-items: center; gap: 12px; padding: 7px 14px; }
+  .tempo-meta { min-width: 85px; }
+  .tempo-meta .t-title { font-size: 0.7rem; letter-spacing: 2px; color: #a08050; text-transform: uppercase; }
+  .tempo-meta .t-val { font-size: 0.9rem; color: #e0c060; font-style: italic; }
+
+  /* ===== SLIDERS ===== */
+  input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; background: linear-gradient(90deg, #5a3810, #c9a84c); border-radius: 4px; outline: none; cursor: pointer; }
+  input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; background: radial-gradient(circle at 40% 35%, #e0c070, #8a6020); border: 2px solid #4a3010; border-radius: 50%; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.4); }
+  input[type="range"]::-moz-range-thumb { width: 20px; height: 20px; background: radial-gradient(circle at 40% 35%, #e0c070, #8a6020); border: 2px solid #4a3010; border-radius: 50%; cursor: pointer; }
+
+  /* ===== CIPHER PANEL ===== */
+  .cipher-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .tab-bar { display: flex; margin-bottom: 10px; flex-shrink: 0; }
+  .tab-btn { flex: 1; padding: 9px 12px; font-family: 'EB Garamond', Georgia, serif; font-size: 0.95rem; letter-spacing: 2px; text-transform: uppercase; border: 1px solid rgba(160,112,48,0.35); cursor: pointer; transition: all 0.3s; background: rgba(30,18,8,0.5); color: #8a6830; }
+  .tab-btn:first-child { border-radius: 8px 0 0 8px; }
+  .tab-btn:last-child { border-radius: 0 8px 8px 0; }
+  .tab-btn.active-encrypt { background: linear-gradient(145deg, #8b5e1a, #6b4310); color: #f5e6c8; border-color: #a07030; }
+  .tab-btn.active-decrypt { background: linear-gradient(145deg, #1a3a5e, #0f2840); color: #c8daf5; border-color: #3070a0; }
+  .tab-btn:hover:not(.active-encrypt):not(.active-decrypt) { background: rgba(60,38,16,0.5); color: #c9a84c; }
+  .tab-content { display: none; flex-direction: column; gap: 8px; flex: 1; min-height: 0; }
+  .tab-content.active { display: flex; }
+  .text-group { display: flex; flex-direction: column; gap: 3px; flex: 1; min-height: 0; }
+  .text-group label { font-size: 0.75rem; letter-spacing: 2px; color: #a08050; text-transform: uppercase; flex-shrink: 0; }
+  textarea { width: 100%; flex: 1; min-height: 50px; padding: 10px 12px; font-family: 'EB Garamond', Georgia, serif; font-size: 1.1rem; letter-spacing: 2px; background: rgba(20,12,5,0.6); border: 1px solid rgba(160,112,48,0.3); border-radius: 8px; color: #f5e6c8; resize: none; outline: none; transition: border-color 0.3s; text-transform: uppercase; }
+  textarea:focus { border-color: rgba(200,160,60,0.6); }
+  textarea::placeholder { color: #6a5030; font-style: italic; text-transform: none; }
+  .output-area { background: rgba(10,6,2,0.7); border-color: rgba(120,80,30,0.3); color: #e0c060; font-weight: 600; text-transform: none; letter-spacing: 3px; }
+  .btn { padding: 9px 16px; font-family: 'EB Garamond', Georgia, serif; font-size: 0.95rem; letter-spacing: 2px; border-radius: 8px; cursor: pointer; transition: all 0.3s; text-transform: uppercase; flex-shrink: 0; }
+  .btn-encrypt { background: linear-gradient(145deg, #8b5e1a, #6b4310); color: #f5e6c8; border: 1px solid #a07030; }
+  .btn-encrypt:hover { background: linear-gradient(145deg, #a07020, #8b5e1a); box-shadow: 0 0 16px rgba(200,160,60,0.3); }
+  .btn-decrypt { background: linear-gradient(145deg, #1a3a5e, #0f2840); color: #c8daf5; border: 1px solid #3070a0; }
+  .btn-decrypt:hover { background: linear-gradient(145deg, #204a70, #1a3a5e); box-shadow: 0 0 16px rgba(60,120,200,0.3); }
+  .status { text-align: center; font-size: 0.75rem; font-style: italic; color: #8a6830; flex-shrink: 0; padding-top: 3px; transition: color 0.3s; }
+  .status.active { color: #e0c060; }
+
+  @media (max-width: 1100px) {
+    .left-column { width: min(60vh, 500px); }
+    .right-column { min-width: 260px; }
+    .header h1 { font-size: 1.4rem; }
+  }
+  @media (max-width: 800px) {
+    .left-column { width: min(50vh, 420px); }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Codierscheibe</h1>
+  <span class="subtitle">Caesar · Chiffre</span>
+</div>
+
+<div class="app-container">
+  <!-- ===== LEFT COLUMN ===== -->
+  <div class="left-column">
+    <div class="wheel-container" id="wheelContainer">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600">
+        <defs>
+          <radialGradient id="bgGrad" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#f5e6c8"/><stop offset="100%" stop-color="#d4b896"/></radialGradient>
+          <radialGradient id="outerRingGrad" cx="50%" cy="40%" r="60%"><stop offset="0%" stop-color="#c9a84c"/><stop offset="40%" stop-color="#a0722a"/><stop offset="100%" stop-color="#6b4c1e"/></radialGradient>
+          <radialGradient id="innerRingGrad" cx="50%" cy="40%" r="60%"><stop offset="0%" stop-color="#b8954a"/><stop offset="40%" stop-color="#8a6020"/><stop offset="100%" stop-color="#5a3e14"/></radialGradient>
+          <radialGradient id="knobGrad" cx="40%" cy="35%" r="60%"><stop offset="0%" stop-color="#e0c070"/><stop offset="60%" stop-color="#a07030"/><stop offset="100%" stop-color="#6b4c1e"/></radialGradient>
+          <filter id="engrave"><feDropShadow dx="0.5" dy="0.5" stdDeviation="0.3" flood-color="#3a2810" flood-opacity="0.8"/></filter>
+          <radialGradient id="rivetGrad" cx="35%" cy="30%" r="65%"><stop offset="0%" stop-color="#e8d080"/><stop offset="50%" stop-color="#c09040"/><stop offset="100%" stop-color="#7a5020"/></radialGradient>
+          <radialGradient id="centerFill" cx="50%" cy="45%" r="55%"><stop offset="0%" stop-color="#f7edd5"/><stop offset="70%" stop-color="#edddb8"/><stop offset="100%" stop-color="#e0cc9f"/></radialGradient>
+        </defs>
+
+        <!-- Background -->
+        <rect width="600" height="600" fill="url(#bgGrad)"/>
+        <line x1="0" y1="150" x2="600" y2="148" stroke="#c9a870" stroke-width="0.3" opacity="0.3"/>
+        <line x1="0" y1="300" x2="600" y2="302" stroke="#c9a870" stroke-width="0.3" opacity="0.3"/>
+        <line x1="0" y1="450" x2="600" y2="448" stroke="#c9a870" stroke-width="0.3" opacity="0.3"/>
+
+        <!-- ===== WHEEL GROUP (both rings, rotates during cipher) ===== -->
+        <g id="wheelGroup">
+          <!-- OUTER RING = KLARTEXT (plaintext, fixed A-Z) -->
+          <circle cx="300" cy="300" r="250" fill="url(#outerRingGrad)" stroke="#4a3010" stroke-width="2.5"/>
+          <circle cx="300" cy="300" r="205" fill="none" stroke="#c9a84c" stroke-width="1.2" opacity="0.6"/>
+          <circle cx="300" cy="300" r="203" fill="none" stroke="#5a3810" stroke-width="0.8" opacity="0.4"/>
+          <g fill="#f5e6c8" font-size="16" font-family="'EB Garamond', Georgia, serif" font-weight="bold" text-anchor="middle" dominant-baseline="middle" filter="url(#engrave)" id="outerLetters"></g>
+          <g stroke="#f0d888" stroke-width="1.8" id="outerMajorTicks"></g>
+          <g stroke="#e8d080" stroke-width="1" opacity="0.7" id="outerMinorTicks"></g>
+          <text x="300" y="93" text-anchor="middle" font-size="9.5" fill="#f5e6c8" font-family="'EB Garamond', Georgia, serif" letter-spacing="4" opacity="0.85">KLARTEXT</text>
+
+          <!-- INNER RING = GEHEIMTEXT (cipher, rotatable) -->
+          <g id="innerRingGroup">
+            <circle cx="300" cy="300" r="198" fill="url(#innerRingGrad)" stroke="#3a2008" stroke-width="2"/>
+            <circle cx="300" cy="300" r="197" fill="none" stroke="#c9a84c" stroke-width="0.8" opacity="0.5"/>
+            <text x="300" y="118" text-anchor="middle" font-size="9.5" fill="#f5e6c8" font-family="'EB Garamond', Georgia, serif" letter-spacing="4" opacity="0.85">GEHEIMTEXT</text>
+            <g stroke="#f0d888" stroke-width="1.5" id="innerMajorTicks"></g>
+            <g id="innerLetters"></g>
+          </g>
+        </g>
+
+        <!-- CENTER PARCHMENT (fixed) -->
+        <circle cx="300" cy="300" r="152" fill="url(#centerFill)" stroke="#9a7040" stroke-width="1.5"/>
+        <circle cx="300" cy="300" r="150" fill="none" stroke="#c9a84c" stroke-width="0.8" opacity="0.6"/>
+        <circle cx="300" cy="300" r="148" fill="none" stroke="#8a6030" stroke-width="0.5" opacity="0.4" stroke-dasharray="4,3"/>
+        <line x1="270" y1="300" x2="330" y2="300" stroke="#9a7040" stroke-width="0.8" opacity="0.4"/>
+        <line x1="300" y1="270" x2="300" y2="330" stroke="#9a7040" stroke-width="0.8" opacity="0.4"/>
+        <line x1="279" y1="279" x2="321" y2="321" stroke="#9a7040" stroke-width="0.5" opacity="0.3"/>
+        <line x1="321" y1="279" x2="279" y2="321" stroke="#9a7040" stroke-width="0.5" opacity="0.3"/>
+        <text x="300" y="240" text-anchor="middle" font-size="10" fill="#7a5020" font-family="'EB Garamond', Georgia, serif" font-style="italic" letter-spacing="2">GAIUS IULIUS</text>
+        <text x="300" y="255" text-anchor="middle" font-size="10" fill="#7a5020" font-family="'EB Garamond', Georgia, serif" font-style="italic" letter-spacing="2">CAESAR</text>
+        <line x1="248" y1="261" x2="352" y2="261" stroke="#9a7040" stroke-width="0.8" opacity="0.6"/>
+        <line x1="260" y1="264" x2="340" y2="264" stroke="#9a7040" stroke-width="0.4" opacity="0.4"/>
+        <text x="300" y="288" text-anchor="middle" font-size="24" fill="#5a3010" font-family="'EB Garamond', Georgia, serif" font-weight="bold" filter="url(#engrave)" id="centerRoman">III</text>
+        <text x="300" y="305" text-anchor="middle" font-size="9" fill="#7a5020" font-family="'EB Garamond', Georgia, serif" letter-spacing="3">VERSCHIEBUNG</text>
+        <line x1="260" y1="312" x2="340" y2="312" stroke="#9a7040" stroke-width="0.6" opacity="0.5"/>
+        <text x="300" y="328" text-anchor="middle" font-size="13" fill="#6a4010" font-family="'EB Garamond', Georgia, serif" id="centerMapping">A → D</text>
+        <text x="300" y="347" text-anchor="middle" font-size="9.5" fill="#7a5020" font-family="'EB Garamond', Georgia, serif" font-style="italic">Klartext → Geheimtext</text>
+        <line x1="252" y1="355" x2="348" y2="355" stroke="#9a7040" stroke-width="0.7" opacity="0.5"/>
+        <text x="300" y="368" text-anchor="middle" font-size="8.5" fill="#8a6030" font-family="'EB Garamond', Georgia, serif" font-style="italic" opacity="0.8">»Veni, vidi, scripsi«</text>
+        <circle cx="300" cy="300" r="22" fill="url(#knobGrad)" stroke="#4a3010" stroke-width="1.5"/>
+        <circle cx="300" cy="300" r="20" fill="none" stroke="#e0c060" stroke-width="0.8" opacity="0.7"/>
+        <line x1="289" y1="300" x2="311" y2="300" stroke="#c09030" stroke-width="1" opacity="0.6"/>
+        <line x1="300" y1="289" x2="300" y2="311" stroke="#c09030" stroke-width="1" opacity="0.6"/>
+        <circle cx="300" cy="300" r="6" fill="#d0a040" stroke="#6a4010" stroke-width="1"/>
+
+        <!-- Pointer -->
+        <polygon points="300,46 294,38 306,38" fill="#8b0000" stroke="#5a0000" stroke-width="1"/>
+
+        <!-- Corner ornaments -->
+        <path d="M 30 30 Q 50 20 60 40 Q 40 50 30 30 Z" fill="#a07030" opacity="0.4"/><circle cx="45" cy="40" r="4" fill="#c09040" opacity="0.5"/>
+        <path d="M 570 30 Q 550 20 540 40 Q 560 50 570 30 Z" fill="#a07030" opacity="0.4"/><circle cx="555" cy="40" r="4" fill="#c09040" opacity="0.5"/>
+        <path d="M 30 570 Q 50 580 60 560 Q 40 550 30 570 Z" fill="#a07030" opacity="0.4"/><circle cx="45" cy="560" r="4" fill="#c09040" opacity="0.5"/>
+        <path d="M 570 570 Q 550 580 540 560 Q 560 550 570 570 Z" fill="#a07030" opacity="0.4"/><circle cx="555" cy="560" r="4" fill="#c09040" opacity="0.5"/>
+
+        <!-- Bottom label -->
+        <line x1="180" y1="527" x2="420" y2="527" stroke="#a07030" stroke-width="0.4"/>
+        <line x1="180" y1="530" x2="420" y2="530" stroke="#a07030" stroke-width="0.8"/>
+        <text x="300" y="547" text-anchor="middle" font-size="10" fill="#5a3810" font-family="'EB Garamond', Georgia, serif" letter-spacing="3">VERSCHLÜSSELUNGSGERÄT</text>
+        <text x="300" y="562" text-anchor="middle" font-size="9" fill="#7a5030" font-family="'EB Garamond', Georgia, serif" font-style="italic" letter-spacing="1">Röm. Kaiserzeit · I. Jh. v. Chr.</text>
+
+        <!-- Rivets -->
+        <circle cx="300" cy="55" r="7" fill="url(#rivetGrad)" stroke="#4a3010" stroke-width="1"/>
+        <circle cx="545" cy="300" r="7" fill="url(#rivetGrad)" stroke="#4a3010" stroke-width="1"/>
+        <circle cx="300" cy="545" r="7" fill="url(#rivetGrad)" stroke="#4a3010" stroke-width="1"/>
+        <circle cx="55" cy="300" r="7" fill="url(#rivetGrad)" stroke="#4a3010" stroke-width="1"/>
+        <circle cx="298" cy="53" r="2" fill="#f0e070" opacity="0.7"/>
+        <circle cx="543" cy="298" r="2" fill="#f0e070" opacity="0.7"/>
+        <circle cx="298" cy="543" r="2" fill="#f0e070" opacity="0.7"/>
+        <circle cx="53" cy="298" r="2" fill="#f0e070" opacity="0.7"/>
+
+        <rect x="10" y="10" width="580" height="580" rx="8" ry="8" fill="none" stroke="#8a6020" stroke-width="2" opacity="0.6"/>
+        <rect x="14" y="14" width="572" height="572" rx="6" ry="6" fill="none" stroke="#c9a84c" stroke-width="0.8" opacity="0.3"/>
+      </svg>
+    </div>
+
+    <!-- Verschiebung -->
+    <div class="panel">
+      <div class="panel-title">Verschiebung</div>
+      <div class="shift-row">
+        <div class="shift-display"><span id="shiftNumber">3</span><span class="roman" id="shiftRoman">III</span></div>
+        <div class="slider-wrap">
+          <input type="range" id="shiftSlider" min="0" max="25" value="3">
+          <div class="slider-labels"><span>0</span><span>13</span><span>25</span></div>
+        </div>
+      </div>
+      <label class="emoji-toggle">
+        <input type="checkbox" id="emojiToggle">
+        <span class="emoji-toggle-label">Emoji-Geheimschrift</span>
+        <span class="emoji-hint">🐶🦊🐻🐼…</span>
+      </label>
+      <div class="mapping-preview" id="mappingPreview"></div>
+    </div>
+
+    <!-- Tempo -->
+    <div class="panel tempo-panel">
+      <div class="tempo-meta"><span class="t-title">Tempo</span><span class="t-val" id="speedLabel">Langsam</span></div>
+      <div class="slider-wrap">
+        <input type="range" id="speedSlider" min="1" max="5" value="2" step="1">
+        <div class="slider-labels"><span>Langsam</span><span>Schnell</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== RIGHT COLUMN ===== -->
+  <div class="right-column">
+    <div class="panel cipher-panel">
+      <div class="tab-bar">
+        <button class="tab-btn active-encrypt" id="tabEncrypt">Verschlüsseln</button>
+        <button class="tab-btn" id="tabDecrypt">Entschlüsseln</button>
+      </div>
+      <div class="tab-content active" id="encryptTab">
+        <div class="text-group">
+          <label>Klartext eingeben</label>
+          <textarea id="plainInput" placeholder="Gib hier deinen Klartext ein …"></textarea>
+        </div>
+        <button class="btn btn-encrypt" id="encryptBtn">▶ Los!</button>
+        <div class="text-group">
+          <label>Geheimtext</label>
+          <textarea id="cipherOutput" class="output-area" readonly placeholder="Hier erscheint der Geheimtext …"></textarea>
+        </div>
+      </div>
+      <div class="tab-content" id="decryptTab">
+        <div class="text-group">
+          <label>Geheimtext eingeben</label>
+          <textarea id="cipherInput" placeholder="Geheimtext hier einfügen …"></textarea>
+        </div>
+        <button class="btn btn-decrypt" id="decryptBtn">▶ Los!</button>
+        <div class="text-group">
+          <label>Klartext</label>
+          <textarea id="plainOutput" class="output-area" readonly placeholder="Hier erscheint der Klartext …"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="status" id="status">Drehe die innere Scheibe oder nutze den Schieberegler</div>
+  </div>
+</div>
+
+<script>
+// ===== AUDIO =====
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let audioCtx = null;
+function ensureAudio() { if (!audioCtx) audioCtx = new AudioCtx(); if (audioCtx.state === 'suspended') audioCtx.resume(); }
+function playClick(vol = 0.25) {
+  try { ensureAudio(); const now = audioCtx.currentTime;
+    // Safe-dial click: sharp metallic impact + resonant ring
+    // Layer 1: sharp attack (metal-on-metal impact)
+    const o1 = audioCtx.createOscillator();
+    const g1 = audioCtx.createGain();
+    const f1 = audioCtx.createBiquadFilter();
+    f1.type = 'bandpass'; f1.frequency.value = 4500; f1.Q.value = 12;
+    o1.type = 'square';
+    o1.frequency.setValueAtTime(3800, now);
+    o1.frequency.exponentialRampToValueAtTime(1200, now + 0.008);
+    g1.gain.setValueAtTime(vol * 1.2, now);
+    g1.gain.exponentialRampToValueAtTime(0.001, now + 0.025);
+    o1.connect(f1); f1.connect(g1); g1.connect(audioCtx.destination);
+    o1.start(now); o1.stop(now + 0.03);
+
+    // Layer 2: metallic resonance (the "ring" after the click)
+    const o2 = audioCtx.createOscillator();
+    const g2 = audioCtx.createGain();
+    const f2 = audioCtx.createBiquadFilter();
+    f2.type = 'bandpass'; f2.frequency.value = 2200; f2.Q.value = 25;
+    o2.type = 'sine';
+    o2.frequency.setValueAtTime(2200, now);
+    o2.frequency.exponentialRampToValueAtTime(1800, now + 0.12);
+    g2.gain.setValueAtTime(vol * 0.35, now + 0.005);
+    g2.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+    o2.connect(f2); f2.connect(g2); g2.connect(audioCtx.destination);
+    o2.start(now); o2.stop(now + 0.13);
+
+    // Layer 3: low mechanical thump (body of the safe)
+    const o3 = audioCtx.createOscillator();
+    const g3 = audioCtx.createGain();
+    const f3 = audioCtx.createBiquadFilter();
+    f3.type = 'lowpass'; f3.frequency.value = 600; f3.Q.value = 3;
+    o3.type = 'triangle';
+    o3.frequency.setValueAtTime(280, now);
+    o3.frequency.exponentialRampToValueAtTime(80, now + 0.06);
+    g3.gain.setValueAtTime(vol * 0.5, now);
+    g3.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
+    o3.connect(f3); f3.connect(g3); g3.connect(audioCtx.destination);
+    o3.start(now); o3.stop(now + 0.08);
+  } catch(e){}
+}
+
+// ===== CONSTANTS =====
+const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+const EMOJIS = ['🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯','🦁','🐮','🐷','🐸','🐵','🐔','🐧','🐦','🦆','🦅','🦉','🦇','🐺','🐗','🐴','🦄'];
+const STEP = 360 / 26;
+const CX = 300, CY = 300;
+
+// ===== SPEED =====
+const SPEED = {
+  1: { dur: 1200, pause: 600, label: 'Sehr langsam' },
+  2: { dur: 800,  pause: 350, label: 'Langsam' },
+  3: { dur: 450,  pause: 180, label: 'Mittel' },
+  4: { dur: 250,  pause: 80,  label: 'Schnell' },
+  5: { dur: 100,  pause: 25,  label: 'Blitz' },
+};
+let speedLevel = 2;
+
+// ===== STATE =====
+// Outer ring = Klartext (A-Z, fixed). Inner ring = Geheimtext (shifted).
+// Inner ring rotation = (26 - shift) % 26 * STEP
+// So shift 3 → rotation 23*STEP → inner D at top (aligned with outer A → A encrypts to D).
+let currentShift = 3;
+let currentRotation = (26 - currentShift) % 26 * STEP;
+let emojiMode = false;
+let isDragging = false, dragStartAngle = 0, rotationAtDragStart = 0, lastClickStep = -1;
+let isAnimating = false;
+
+// ===== DOM =====
+const innerRingGroup = document.getElementById('innerRingGroup');
+const wheelGroup = document.getElementById('wheelGroup');
+const wheelContainer = document.getElementById('wheelContainer');
+const shiftSlider = document.getElementById('shiftSlider');
+const shiftNumber = document.getElementById('shiftNumber');
+const shiftRoman = document.getElementById('shiftRoman');
+const centerRoman = document.getElementById('centerRoman');
+const centerMapping = document.getElementById('centerMapping');
+const mappingPreview = document.getElementById('mappingPreview');
+const plainInput = document.getElementById('plainInput');
+const cipherOutput = document.getElementById('cipherOutput');
+const cipherInput = document.getElementById('cipherInput');
+const plainOutput = document.getElementById('plainOutput');
+const encryptBtn = document.getElementById('encryptBtn');
+const decryptBtn = document.getElementById('decryptBtn');
+const statusEl = document.getElementById('status');
+const speedSlider = document.getElementById('speedSlider');
+const speedLabel = document.getElementById('speedLabel');
+const emojiToggle = document.getElementById('emojiToggle');
+
+// ===== SPEED SLIDER =====
+speedSlider.addEventListener('input', () => { speedLevel = +speedSlider.value; speedLabel.textContent = SPEED[speedLevel].label; });
+speedLabel.textContent = SPEED[speedLevel].label;
+
+// ===== EMOJI TOGGLE =====
+emojiToggle.addEventListener('change', () => {
+  emojiMode = emojiToggle.checked;
+  rebuildInnerLetters();
+  updateUI();
+});
+
+// ===== ROMAN NUMERALS =====
+function toRoman(n) {
+  if (n === 0) return '0';
+  const v = [10,9,5,4,1], s = ['X','IX','V','IV','I']; let r = '';
+  for (let i = 0; i < v.length; i++) while (n >= v[i]) { r += s[i]; n -= v[i]; }
+  return r;
+}
+
+// ===== GENERATE SVG =====
+function generateOuterRing() {
+  const oL = document.getElementById('outerLetters');
+  const oMj = document.getElementById('outerMajorTicks');
+  const oMn = document.getElementById('outerMinorTicks');
+  for (let i = 0; i < 26; i++) {
+    const a = i * STEP;
+    const t = document.createElementNS('http://www.w3.org/2000/svg','text');
+    t.setAttribute('transform',`rotate(${a},${CX},${CY}) translate(${CX},72)`);
+    t.textContent = LETTERS[i]; oL.appendChild(t);
+    const mj = document.createElementNS('http://www.w3.org/2000/svg','line');
+    mj.setAttribute('transform',`rotate(${a},${CX},${CY})`);
+    mj.setAttribute('x1',CX); mj.setAttribute('y1',50); mj.setAttribute('x2',CX); mj.setAttribute('y2',64);
+    oMj.appendChild(mj);
+    const mn = document.createElementNS('http://www.w3.org/2000/svg','line');
+    mn.setAttribute('transform',`rotate(${a+STEP/2},${CX},${CY})`);
+    mn.setAttribute('x1',CX); mn.setAttribute('y1',52); mn.setAttribute('x2',CX); mn.setAttribute('y2',60);
+    oMn.appendChild(mn);
+  }
+}
+
+function generateInnerTicks() {
+  const iMj = document.getElementById('innerMajorTicks');
+  for (let i = 0; i < 26; i++) {
+    const a = i * STEP;
+    const mj = document.createElementNS('http://www.w3.org/2000/svg','line');
+    mj.setAttribute('transform',`rotate(${a},${CX},${CY})`);
+    mj.setAttribute('x1',CX); mj.setAttribute('y1',104); mj.setAttribute('x2',CX); mj.setAttribute('y2',116);
+    iMj.appendChild(mj);
+  }
+}
+
+function rebuildInnerLetters() {
+  const iL = document.getElementById('innerLetters');
+  iL.innerHTML = '';
+  const glyphs = emojiMode ? EMOJIS : LETTERS.split('');
+  const sz = emojiMode ? '13' : '15';
+  for (let i = 0; i < 26; i++) {
+    const a = i * STEP;
+    const t = document.createElementNS('http://www.w3.org/2000/svg','text');
+    t.setAttribute('transform',`rotate(${a},${CX},${CY}) translate(${CX},126)`);
+    t.setAttribute('font-size', sz);
+    t.setAttribute('fill','#fdf0d0');
+    t.setAttribute('font-family',"'EB Garamond', Georgia, serif");
+    t.setAttribute('font-weight','bold');
+    t.setAttribute('text-anchor','middle');
+    t.setAttribute('dominant-baseline','middle');
+    t.textContent = glyphs[i];
+    iL.appendChild(t);
+  }
+}
+
+// ===== UPDATE UI =====
+function updateUI() {
+  currentRotation = (26 - currentShift) % 26 * STEP;
+  if (currentShift === 0) currentRotation = 0;
+  innerRingGroup.setAttribute('transform', `rotate(${currentRotation}, ${CX}, ${CY})`);
+
+  shiftNumber.textContent = currentShift;
+  const rom = toRoman(currentShift);
+  shiftRoman.textContent = rom;
+  centerRoman.textContent = rom || '0';
+  shiftSlider.value = currentShift;
+
+  const cipherGlyph = emojiMode ? EMOJIS[currentShift % 26] : LETTERS[currentShift % 26];
+  centerMapping.textContent = `A → ${cipherGlyph}`;
+
+  // Mapping preview
+  mappingPreview.innerHTML = '';
+  mappingPreview.className = 'mapping-preview' + (emojiMode ? ' emoji-active' : '');
+  for (let i = 0; i < 26; i++) {
+    const ci = (i + currentShift) % 26;
+    const cipher = emojiMode ? EMOJIS[ci] : LETTERS[ci];
+    const d = document.createElement('div'); d.className = 'mapping-pair';
+    d.innerHTML = `<span class="plain">${LETTERS[i]}</span><span class="arrow">↓</span><span class="cipher">${cipher}</span>`;
+    mappingPreview.appendChild(d);
+  }
+}
+
+// ===== SNAP =====
+async function snapRotation() {
+  let rot = ((currentRotation % 360) + 360) % 360;
+  let step = Math.round(rot / STEP); if (step >= 26) step = 0;
+  currentShift = (26 - step) % 26;
+  currentRotation = step * STEP;
+  await tweenRotation(currentRotation, 120);
+  playClick(0.15);
+  updateUI();
+}
+
+// ===== DRAG =====
+function getAngle(e) {
+  const r = wheelContainer.getBoundingClientRect();
+  const cx = r.left + r.width/2, cy = r.top + r.height/2;
+  const ex = e.touches ? e.touches[0].clientX : e.clientX;
+  const ey = e.touches ? e.touches[0].clientY : e.clientY;
+  return Math.atan2(ey - cy, ex - cx) * (180 / Math.PI);
+}
+wheelContainer.addEventListener('mousedown', startDrag);
+wheelContainer.addEventListener('touchstart', startDrag, {passive:false});
+function startDrag(e) {
+  if (isAnimating) return; e.preventDefault(); ensureAudio();
+  isDragging = true; dragStartAngle = getAngle(e); rotationAtDragStart = currentRotation; lastClickStep = -1;
+}
+document.addEventListener('mousemove', onDrag);
+document.addEventListener('touchmove', onDrag, {passive:false});
+function onDrag(e) {
+  if (!isDragging) return; e.preventDefault();
+  let delta = getAngle(e) - dragStartAngle;
+  if (delta > 180) delta -= 360; if (delta < -180) delta += 360;
+  // Clockwise drag (positive delta) → subtract from rotation → increases shift
+  currentRotation = rotationAtDragStart - delta;
+  let norm = ((currentRotation % 360) + 360) % 360;
+  let si = Math.round(norm / STEP) % 26;
+  if (si !== lastClickStep) { playClick(0.1); lastClickStep = si; }
+  innerRingGroup.setAttribute('transform', `rotate(${currentRotation}, ${CX}, ${CY})`);
+}
+document.addEventListener('mouseup', endDrag);
+document.addEventListener('touchend', endDrag);
+function endDrag() { if (!isDragging) return; isDragging = false; snapRotation(); }
+
+// ===== SLIDER =====
+let sliderTw = false;
+shiftSlider.addEventListener('input', async () => {
+  if (isAnimating) return;
+  const ns = +shiftSlider.value; if (ns === currentShift) return;
+  currentShift = ns;
+  currentRotation = currentShift === 0 ? 0 : (26 - currentShift) * STEP;
+  shiftNumber.textContent = currentShift;
+  const rom = toRoman(currentShift);
+  shiftRoman.textContent = rom; centerRoman.textContent = rom || '0';
+  const cg = emojiMode ? EMOJIS[currentShift % 26] : LETTERS[currentShift % 26];
+  centerMapping.textContent = `A → ${cg}`;
+  if (!sliderTw) { sliderTw = true; await tweenRotation(currentRotation, 180); playClick(0.15); sliderTw = false; updateUI(); }
+});
+
+// ===== TWEEN =====
+function tweenRotation(targetAngle, durationMs, withClicks = false, el = null) {
+  const target = el || innerRingGroup;
+  return new Promise(resolve => {
+    const tf = target.getAttribute('transform') || '';
+    const m = tf.match(/rotate\(([-\d.]+)/);
+    let start = m ? parseFloat(m[1]) : 0;
+    start = ((start % 360) + 360) % 360;
+    let end = ((targetAngle % 360) + 360) % 360;
+    let delta = end - start;
+    if (delta > 180) delta -= 360; if (delta < -180) delta += 360;
+    if (Math.abs(delta) < 0.1 || durationMs <= 0) { target.setAttribute('transform',`rotate(${end},${CX},${CY})`); resolve(); return; }
+    let lastSi = Math.round(start / STEP) % 26;
+    const t0 = performance.now();
+    function tick(now) {
+      const t = Math.min((now - t0) / durationMs, 1);
+      const ease = t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2;
+      const a = ((start + delta * ease) % 360 + 360) % 360;
+      target.setAttribute('transform',`rotate(${a},${CX},${CY})`);
+      if (withClicks) { const si = Math.round(a / STEP) % 26; if (si !== lastSi) { playClick(0.08); lastSi = si; } }
+      if (t < 1) requestAnimationFrame(tick);
+      else { target.setAttribute('transform',`rotate(${end},${CX},${CY})`); resolve(); }
+    }
+    requestAnimationFrame(tick);
+  });
+}
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ===== CIPHER LOGIC =====
+// Outer ring = Klartext (plain A-Z). Inner ring = Geheimtext (shifted alphabet / emojis).
+// Encrypt: rotate whole wheel so outer letter (plain) is at pointer → inner letter at pointer = cipher.
+// Decrypt: rotate whole wheel so inner letter (cipher) is at pointer → outer letter at pointer = plain.
+async function animateCipher(text, isEncrypt) {
+  if (isAnimating) return;
+  isAnimating = true; ensureAudio();
+  const out = isEncrypt ? cipherOutput : plainOutput;
+  out.value = '';
+  statusEl.textContent = (isEncrypt ? 'Verschlüssele' : 'Entschlüssele') + ' …';
+  statusEl.classList.add('active');
+
+  // Reset wheelGroup and set inner ring to shift position
+  wheelGroup.setAttribute('transform', `rotate(0,${CX},${CY})`);
+  const innerRot = currentShift === 0 ? 0 : (26 - currentShift) * STEP;
+  innerRingGroup.setAttribute('transform', `rotate(${innerRot},${CX},${CY})`);
+
+  const chars = isEncrypt
+    ? text.toUpperCase().split('')
+    : (emojiMode ? Array.from(text) : text.toUpperCase().split(''));
+  let result = '';
+  const sp = SPEED[speedLevel];
+
+  for (const ch of chars) {
+    let idx;
+    if (isEncrypt) {
+      idx = LETTERS.indexOf(ch);
+    } else {
+      idx = emojiMode ? EMOJIS.indexOf(ch) : LETTERS.indexOf(ch);
+    }
+    if (idx === -1) {
+      if (!emojiMode || isEncrypt) { result += ch; out.value = result; }
+      continue;
+    }
+
+    // Calculate wheelGroup rotation target
+    let wheelTarget;
+    if (isEncrypt) {
+      // Bring outer letter[idx] (plain) to pointer: wheelTarget = (26-idx)%26 * STEP
+      wheelTarget = ((26 - idx) % 26) * STEP;
+    } else {
+      // Bring inner letter[idx] (cipher) to pointer
+      // Inner idx is at angle: innerRot + idx*STEP = (26-shift+idx)*STEP
+      // wheelTarget = 360 - (26-shift+idx)*STEP = (shift-idx+26)%26 * STEP
+      wheelTarget = ((currentShift - idx + 26) % 26) * STEP;
+    }
+
+    await tweenRotation(wheelTarget, sp.dur, true, wheelGroup);
+    playClick(0.2);
+
+    // Compute output
+    if (isEncrypt) {
+      const ci = (idx + currentShift) % 26;
+      result += emojiMode ? EMOJIS[ci] : LETTERS[ci];
+    } else {
+      result += LETTERS[(idx - currentShift + 26) % 26];
+    }
+    out.value = result;
+    await sleep(sp.pause);
+  }
+
+  await tweenRotation(0, sp.dur, true, wheelGroup);
+  wheelGroup.setAttribute('transform', `rotate(0,${CX},${CY})`);
+  updateUI();
+
+  statusEl.textContent = isEncrypt ? 'Verschlüsselung abgeschlossen' : 'Entschlüsselung abgeschlossen';
+  setTimeout(() => { statusEl.textContent = 'Bereit'; statusEl.classList.remove('active'); }, 2000);
+  isAnimating = false;
+}
+
+// ===== TABS =====
+const tabEncrypt = document.getElementById('tabEncrypt'), tabDecrypt = document.getElementById('tabDecrypt');
+const encryptTab = document.getElementById('encryptTab'), decryptTab = document.getElementById('decryptTab');
+tabEncrypt.addEventListener('click', () => {
+  if (isAnimating) return;
+  tabEncrypt.className = 'tab-btn active-encrypt'; tabDecrypt.className = 'tab-btn';
+  encryptTab.classList.add('active'); decryptTab.classList.remove('active');
+});
+tabDecrypt.addEventListener('click', () => {
+  if (isAnimating) return;
+  tabDecrypt.className = 'tab-btn active-decrypt'; tabEncrypt.className = 'tab-btn';
+  decryptTab.classList.add('active'); encryptTab.classList.remove('active');
+});
+
+// ===== BUTTONS =====
+encryptBtn.addEventListener('click', () => { const t = plainInput.value.trim(); if (t) animateCipher(t, true); });
+decryptBtn.addEventListener('click', () => { const t = cipherInput.value.trim(); if (t) animateCipher(t, false); });
+plainInput.addEventListener('keydown', e => { if ((e.ctrlKey||e.metaKey) && e.key==='Enter') encryptBtn.click(); });
+cipherInput.addEventListener('keydown', e => { if ((e.ctrlKey||e.metaKey) && e.key==='Enter') decryptBtn.click(); });
+
+// ===== INIT =====
+generateOuterRing();
+generateInnerTicks();
+rebuildInnerLetters();
+updateUI();
+</script>
+</body>
+</html>
